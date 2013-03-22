@@ -427,6 +427,32 @@ static int __init dmi_present(const char __iomem *p)
 	return 1;
 }
 
+static int __init smbios_present(const char __iomem *p)
+{
+	u8 buf[32];
+
+	memcpy_fromio(buf, p, 32);
+	if ((buf[5] < 32) && dmi_checksum(buf, buf[5])) {
+		dmi_ver = (buf[6] << 8) + buf[7];
+
+		/* Some BIOS report weird SMBIOS version, fix that up */
+		switch (dmi_ver) {
+		case 0x021F:
+		case 0x0221:
+			pr_debug("SMBIOS version fixup(2.%d->2.%d)\n",
+			       dmi_ver & 0xFF, 3);
+			dmi_ver = 0x0203;
+			break;
+		case 0x0233:
+			pr_debug("SMBIOS version fixup(2.%d->2.%d)\n", 51, 6);
+			dmi_ver = 0x0206;
+			break;
+		}
+		return memcmp(p + 16, "_DMI_", 5) || dmi_present(p + 16);
+	}
+	return 1;
+}
+
 void __init dmi_scan_machine(void)
 {
 	char __iomem *p, *q;
