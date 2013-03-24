@@ -523,10 +523,6 @@ static void dhd_set_packet_filter(int value, dhd_pub_t *dhd)
 }
 
 #if defined(CONFIG_HAS_EARLYSUSPEND)
-bool wifi_pm = true;
-module_param(wifi_pm, bool, 0755);
-EXPORT_SYMBOL(wifi_pm);
-
 static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 {
 	int power_mode = PM_MAX;
