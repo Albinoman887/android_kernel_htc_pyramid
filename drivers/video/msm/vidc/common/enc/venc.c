@@ -26,15 +26,20 @@
 #include <linux/wait.h>
 #include <linux/workqueue.h>
 #include <linux/android_pmem.h>
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
 #include <linux/clk.h>
+#endif
 #include <media/msm/vidc_type.h>
 #include <media/msm/vcd_api.h>
 #include <media/msm/vidc_init.h>
 
 #include "venc_internal.h"
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
 #include "vcd_res_tracker_api.h"
+#endif
 
 #define VID_ENC_NAME	"msm_vidc_enc"
+
 
 #if DEBUG
 #define DBG(x...) printk(KERN_DEBUG x)
@@ -422,9 +427,10 @@ static u32 vid_enc_msg_pending(struct video_client_ctx *client_ctx)
 				__func__);
 			return client_ctx->stop_msg;
 		}
-	} else
+	} else {
 		DBG("%s(): vid_enc msg queue Not empty\n",
 			__func__);
+		}
 
 	return !islist_empty;
 }
@@ -485,13 +491,17 @@ static u32 vid_enc_close_client(struct video_client_ctx *client_ctx)
 			rc = wait_for_completion_timeout(&client_ctx->event,
 				5 * HZ);
 			if (!rc) {
-				ERR("%s:ERROR vcd_stop time out"
+/* HTC_START */
+				INFO("%s:Warning: vcd_stop time out"
 				"rc = %d\n", __func__, rc);
+/* HTC_END */
 			}
 
 			if (client_ctx->event_status) {
-				ERR("%s:ERROR "
+/* HTC_START */
+				INFO("%s:Warning "
 				"vcd_stop Not successs\n", __func__);
+/* HTC_END */
 			}
 		}
 	}
@@ -534,9 +544,14 @@ static int vid_enc_open(struct inode *inode, struct file *file)
 
 	stop_cmd = 0;
 	client_count = vcd_get_num_of_clients();
-	if (client_count == VIDC_MAX_NUM_CLIENTS) {
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+	if (client_count == VIDC_MAX_NUM_CLIENTS ||
+		res_trk_check_for_sec_session()) {
+#else
+    if (client_count == VIDC_MAX_NUM_CLIENTS) {
+#endif
 		ERR("ERROR : vid_enc_open() max number of clients"
-		    "limit reached\n");
+		    "limit reached or secure session is open\n");
 		mutex_unlock(&vid_enc_device_p->lock);
 		return -ENODEV;
 	}
@@ -549,11 +564,13 @@ static int vid_enc_open(struct inode *inode, struct file *file)
 
 	client_index = vid_enc_get_empty_client_index();
 
-	if (client_index == -1) {
+	/* HTC_START (klockwork issue)*/
+	if (client_index < 0) {
 		ERR("%s() : No free clients client_index == -1\n",
 			__func__);
 		return -ENODEV;
 	}
+    /* HTC_END */
 
 	client_ctx =
 		&vid_enc_device_p->venc_clients[client_index];
@@ -838,16 +855,20 @@ static long vid_enc_ioctl(struct file *file,
 	{
 		enum venc_buffer_dir buffer_dir;
 		struct venc_bufferpayload buffer_info;
-		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg))) {
+/* HTC_START*/
+			pr_info("[VID] VENC_FREE_BUF ERR 1");
 			return -EFAULT;
-
+		}
 		DBG("VEN_IOCTL_CMD_FREE_INPUT_BUFFER/"
 			"VEN_IOCTL_CMD_FREE_OUTPUT_BUFFER\n");
 
 		if (copy_from_user(&buffer_info, venc_msg.in,
-			sizeof(buffer_info)))
+			sizeof(buffer_info))) {
+/* HTC_START */
+			pr_info("[VID] VENC_FREE_BUF ERR 2");
 			return -EFAULT;
-
+		}
 		buffer_dir = VEN_BUFFER_TYPE_INPUT;
 		if (cmd == VEN_IOCTL_CMD_FREE_OUTPUT_BUFFER)
 			buffer_dir = VEN_BUFFER_TYPE_OUTPUT;
@@ -857,6 +878,8 @@ static long vid_enc_ioctl(struct file *file,
 		if (!result) {
 			DBG("\n VEN_IOCTL_CMD_FREE_OUTPUT_BUFFER"
 				"/VEN_IOCTL_CMD_FREE_OUTPUT_BUFFER failed");
+/* HTC_START */
+			pr_info("[VID] VENC_FREE_BUF ERR 3");
 			return -EIO;
 		}
 		break;
@@ -1319,6 +1342,9 @@ static long vid_enc_ioctl(struct file *file,
 	case VEN_IOCTL_GET_SEQUENCE_HDR:
 	{
 		struct venc_seqheader seq_header, seq_header_user;
+		/* HTC_START (klockwork issue)*/
+		memset(&seq_header, 0, sizeof(struct venc_seqheader));
+		/* HTC_END */
 		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
 			return -EFAULT;
 
@@ -1606,6 +1632,20 @@ static long vid_enc_ioctl(struct file *file,
 		}
 		if (!result) {
 			ERR("setting VEN_IOCTL_(G)SET_LIVE_MODE failed\n");
+		}
+		break;
+	}
+	case VEN_IOCTL_SET_SLICE_DELIVERY_MODE:
+	{
+		struct vcd_property_hdr vcd_property_hdr;
+		u32 vcd_status = VCD_ERR_FAIL;
+		u32 enable = true;
+		vcd_property_hdr.prop_id = VCD_I_SLICE_DELIVERY_MODE;
+		vcd_property_hdr.sz = sizeof(u32);
+		vcd_status = vcd_set_property(client_ctx->vcd_handle,
+						&vcd_property_hdr, &enable);
+		if (vcd_status) {
+			pr_err(" Setting slice delivery mode failed");
 			return -EIO;
 		}
 		break;

@@ -288,6 +288,9 @@ static u32 ddl_set_dec_property(struct ddl_client_context *ddl,
 				ddl_set_default_decoder_buffer_req(decoder,
 					true);
 			}
+			DDL_MSG_LOW("set  VCD_I_FRAME_SIZE width = %d"
+				" height = %d\n",
+				frame_size->width, frame_size->height);
 			vcd_status = VCD_S_SUCCESS;
 		}
 	}
@@ -609,7 +612,15 @@ static u32 ddl_set_enc_property(struct ddl_client_context *ddl,
 		struct vcd_property_multi_slice *multi_slice =
 			(struct vcd_property_multi_slice *)
 				property_value;
-
+		DDL_MSG_HIGH("VCD_I_MULTI_SLICE eMSliceSel %d  nMSliceSize %d"
+				"Tot#of MB %d encoder->frame_size.width = %d"
+				"encoder->frame_size.height = %d",
+				(int)multi_slice->m_slice_sel,
+				multi_slice->m_slice_size,
+				DDL_NO_OF_MB(encoder->frame_size.width,
+					encoder->frame_size.height),
+				encoder->frame_size.width,
+				encoder->frame_size.height);
 		switch (multi_slice->m_slice_sel) {
 		case VCD_MSLICE_OFF:
 			vcd_status = VCD_S_SUCCESS;
@@ -619,11 +630,14 @@ static u32 ddl_set_enc_property(struct ddl_client_context *ddl,
 				vcd_status = VCD_S_SUCCESS;
 		break;
 		case VCD_MSLICE_BY_MB_COUNT:
-			if (multi_slice->m_slice_size >= 1 &&
+		{
+			if ((multi_slice->m_slice_size >= 1) &&
 				(multi_slice->m_slice_size <=
 				DDL_NO_OF_MB(encoder->frame_size.width,
-				encoder->frame_size.height)))
+					encoder->frame_size.height))) {
 				vcd_status = VCD_S_SUCCESS;
+			}
+		}
 		break;
 		case VCD_MSLICE_BY_BYTE_COUNT:
 			if (multi_slice->m_slice_size > 0)
@@ -851,6 +865,9 @@ static u32 ddl_set_enc_property(struct ddl_client_context *ddl,
 			encoder->client_output_buf_req.sz =
 				DDL_ALIGN(buffer_req->sz,
 				DDL_KILO_BYTE(4));
+			DDL_MSG_LOW("%s encoder->client_output_buf_req.sz"
+				"  = %d\n", __func__,
+				encoder->client_output_buf_req.sz);
 			vcd_status = VCD_S_SUCCESS;
 		}
 	}
@@ -921,8 +938,14 @@ static u32 ddl_set_enc_property(struct ddl_client_context *ddl,
 	case VCD_I_METADATA_HEADER:
 		DDL_MSG_LOW("Meta Data Interface is Requested");
 		if (!res_trk_check_for_sec_session()) {
-			vcd_status = ddl_set_metadata_params(ddl,
-				property_hdr, property_value);
+			if (!encoder->slice_delivery_info.enable) {
+				vcd_status = ddl_set_metadata_params(ddl,
+						property_hdr, property_value);
+			} else {
+				DDL_MSG_ERROR("Ignoring meta data settting in "
+					"slice mode: %s\n", __func__);
+				vcd_status = VCD_S_SUCCESS;
+			}
 		} else {
 			DDL_MSG_ERROR("Meta Data Interface is not "
 				"supported in secure session");
@@ -1424,7 +1447,10 @@ static u32 ddl_get_enc_property(struct ddl_client_context *ddl,
 			property_hdr->sz) {
 				*(struct vcd_buffer_requirement *)
 			property_value = encoder->client_output_buf_req;
-				vcd_status = VCD_S_SUCCESS;
+			DDL_MSG_LOW("%s encoder->client_output_buf_req = %d\n",
+				 __func__,
+				encoder->client_output_buf_req.sz);
+			vcd_status = VCD_S_SUCCESS;
 		}
 	break;
 	case VCD_I_BUFFER_FORMAT:
@@ -1656,6 +1682,9 @@ static void ddl_set_default_enc_property(struct ddl_client_context *ddl)
 		encoder->closed_gop = true;
 	ddl_set_default_metadata_flag(ddl);
 	ddl_set_default_encoder_buffer_req(encoder);
+	encoder->slice_delivery_info.enable = 0;
+	encoder->slice_delivery_info.num_slices = 0;
+	encoder->slice_delivery_info.num_slices_enc = 0;
 }
 
 static void ddl_set_default_enc_profile(struct ddl_encoder_data *encoder)
@@ -1802,8 +1831,7 @@ void ddl_set_default_encoder_buffer_req(struct ddl_encoder_data *encoder)
 	encoder->client_input_buf_req = encoder->input_buf_req;
 	memset(&encoder->output_buf_req , 0 ,
 		sizeof(struct vcd_buffer_requirement));
-	encoder->output_buf_req.min_count    =
-		encoder->i_period.b_frames + 2;
+	encoder->output_buf_req.min_count = encoder->i_period.b_frames + 2;
 	encoder->output_buf_req.actual_count =
 		encoder->output_buf_req.min_count + 3;
 	encoder->output_buf_req.max_count    = DDL_MAX_BUFFER_COUNT;
@@ -1814,6 +1842,8 @@ void ddl_set_default_encoder_buffer_req(struct ddl_encoder_data *encoder)
 		DDL_ALIGN(y_cb_cr_size, DDL_KILO_BYTE(4));
 	ddl_set_default_encoder_metadata_buffer_size(encoder);
 	encoder->client_output_buf_req = encoder->output_buf_req;
+	DDL_MSG_LOW("%s encoder->client_output_buf_req.sz = %d\n",
+		__func__, encoder->client_output_buf_req.sz);
 }
 
 u32 ddl_set_default_decoder_buffer_req(struct ddl_decoder_data *decoder,

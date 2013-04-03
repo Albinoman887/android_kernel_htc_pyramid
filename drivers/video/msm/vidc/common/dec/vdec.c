@@ -37,9 +37,9 @@
 
 
 
-#define DBG(x...) pr_debug(x)
-#define INFO(x...) pr_info(x)
-#define ERR(x...) pr_err(x)
+#define DBG(x...) pr_debug("[VID] " x)
+#define INFO(x...) pr_info("[VID] " x)
+#define ERR(x...) pr_err("[VID] " x)
 
 #define VID_DEC_NAME "msm_vidc_dec"
 
@@ -235,6 +235,10 @@ static void vid_dec_output_frame_done(struct video_client_ctx *client_ctx,
 	struct file *file;
 	s32 buffer_index = -1;
 	enum vdec_picture pic_type;
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+	u32 ion_flag = 0;
+#endif
+	struct vdec_output_frameinfo  *output_frame;
 
 	if (!client_ctx || !vcd_frame_data) {
 		ERR("vid_dec_input_frame_done() NULL pointer\n");
@@ -268,7 +272,6 @@ static void vid_dec_output_frame_done(struct video_client_ctx *client_ctx,
 				      &phy_addr, &pmem_fd, &file,
 				      &buffer_index) ||
 		(vcd_frame_data->flags & VCD_FRAME_FLAG_EOS)) {
-
 		/* Buffer address in user space */
 		vdec_msg->vdec_msg_info.msgdata.output_frame.bufferaddr =
 		    (u8 *) user_vaddr;
@@ -328,6 +331,13 @@ static void vid_dec_output_frame_done(struct video_client_ctx *client_ctx,
 		}
 		vdec_msg->vdec_msg_info.msgdata.output_frame.pic_type =
 			pic_type;
+		output_frame = &vdec_msg->vdec_msg_info.msgdata.output_frame;
+		output_frame->aspect_ratio_info.aspect_ratio =
+			vcd_frame_data->aspect_ratio_info.aspect_ratio;
+		output_frame->aspect_ratio_info.par_width =
+			vcd_frame_data->aspect_ratio_info.extended_par_width;
+		output_frame->aspect_ratio_info.par_height =
+			vcd_frame_data->aspect_ratio_info.extended_par_height;
 		vdec_msg->vdec_msg_info.msgdatasize =
 		    sizeof(struct vdec_output_frameinfo);
 	} else {
@@ -374,49 +384,49 @@ static void vid_dec_lean_event(struct video_client_ctx *client_ctx,
 
 	switch (event) {
 	case VCD_EVT_IND_OUTPUT_RECONFIG:
-		DBG("msm_vidc_dec: Sending VDEC_MSG_EVT_CONFIG_CHANGED"
+		INFO("msm_vidc_dec: Sending VDEC_MSG_EVT_CONFIG_CHANGED"
 			 " to client");
 		vdec_msg->vdec_msg_info.msgcode = VDEC_MSG_EVT_CONFIG_CHANGED;
 		break;
 	case VCD_EVT_IND_RESOURCES_LOST:
-		DBG("msm_vidc_dec: Sending VDEC_EVT_RESOURCES_LOST"
+		INFO("msm_vidc_dec: Sending VDEC_EVT_RESOURCES_LOST"
 			 " to client");
 		vdec_msg->vdec_msg_info.msgcode = VDEC_EVT_RESOURCES_LOST;
 		break;
 	case VCD_EVT_RESP_FLUSH_INPUT_DONE:
-		DBG("msm_vidc_dec: Sending VDEC_MSG_RESP_FLUSH_INPUT_DONE"
+		INFO("msm_vidc_dec: Sending VDEC_MSG_RESP_FLUSH_INPUT_DONE"
 			 " to client");
 		vdec_msg->vdec_msg_info.msgcode =
 		    VDEC_MSG_RESP_FLUSH_INPUT_DONE;
 		break;
 	case VCD_EVT_RESP_FLUSH_OUTPUT_DONE:
-		DBG("msm_vidc_dec: Sending VDEC_MSG_RESP_FLUSH_OUTPUT_DONE"
+		INFO("msm_vidc_dec: Sending VDEC_MSG_RESP_FLUSH_OUTPUT_DONE"
 			 " to client");
 		vdec_msg->vdec_msg_info.msgcode =
 		    VDEC_MSG_RESP_FLUSH_OUTPUT_DONE;
 		break;
 	case VCD_EVT_IND_HWERRFATAL:
-		DBG("msm_vidc_dec: Sending VDEC_MSG_EVT_HW_ERROR"
+		INFO("msm_vidc_dec: Sending VDEC_MSG_EVT_HW_ERROR"
 			 " to client");
 		vdec_msg->vdec_msg_info.msgcode = VDEC_MSG_EVT_HW_ERROR;
 		break;
 	case VCD_EVT_RESP_START:
-		DBG("msm_vidc_dec: Sending VDEC_MSG_RESP_START_DONE"
+		INFO("msm_vidc_dec: Sending VDEC_MSG_RESP_START_DONE"
 			 " to client");
 		vdec_msg->vdec_msg_info.msgcode = VDEC_MSG_RESP_START_DONE;
 		break;
 	case VCD_EVT_RESP_STOP:
-		DBG("msm_vidc_dec: Sending VDEC_MSG_RESP_STOP_DONE"
+		INFO("msm_vidc_dec: Sending VDEC_MSG_RESP_STOP_DONE"
 			 " to client");
 		vdec_msg->vdec_msg_info.msgcode = VDEC_MSG_RESP_STOP_DONE;
 		break;
 	case VCD_EVT_RESP_PAUSE:
-		DBG("msm_vidc_dec: Sending VDEC_MSG_RESP_PAUSE_DONE"
+		INFO("msm_vidc_dec: Sending VDEC_MSG_RESP_PAUSE_DONE"
 			 " to client");
 		vdec_msg->vdec_msg_info.msgcode = VDEC_MSG_RESP_PAUSE_DONE;
 		break;
 	case VCD_EVT_IND_INFO_OUTPUT_RECONFIG:
-		DBG("msm_vidc_dec: Sending VDEC_MSG_EVT_INFO_CONFIG_CHANGED"
+		INFO("msm_vidc_dec: Sending VDEC_MSG_EVT_INFO_CONFIG_CHANGED"
 			 " to client");
 		vdec_msg->vdec_msg_info.msgcode =
 			 VDEC_MSG_EVT_INFO_CONFIG_CHANGED;
@@ -1078,7 +1088,6 @@ static u32 vid_dec_set_buffer(struct video_client_ctx *client_ctx,
 		    __func__, buffer_info->buffer.bufferaddr);
 		return false;
 	}
-
 	vcd_status = vcd_set_buffer(client_ctx->vcd_handle,
 		buffer, (u8 *) kernel_vaddr,
 		buffer_info->buffer.buffer_len);
@@ -1133,11 +1142,11 @@ static u32 vid_dec_pause_resume(struct video_client_ctx *client_ctx, u32 pause)
 	}
 
 	if (pause) {
-		DBG("msm_vidc_dec: PAUSE command from client = %p\n",
+		INFO("msm_vidc_dec: PAUSE command from client = %p\n",
 			 client_ctx);
 		vcd_status = vcd_pause(client_ctx->vcd_handle);
 	} else{
-		DBG("msm_vidc_dec: RESUME command from client = %p\n",
+		INFO("msm_vidc_dec: RESUME command from client = %p\n",
 			 client_ctx);
 		vcd_status = vcd_resume(client_ctx->vcd_handle);
 	}
@@ -1154,7 +1163,7 @@ static u32 vid_dec_start_stop(struct video_client_ctx *client_ctx, u32 start)
 	struct vid_dec_msg *vdec_msg = NULL;
 	u32 vcd_status;
 
-	DBG("msm_vidc_dec: Inside %s()", __func__);
+	INFO("msm_vidc_dec: Inside %s()", __func__);
 	if (!client_ctx) {
 		ERR("\n Invalid client_ctx");
 		return false;
@@ -1162,7 +1171,7 @@ static u32 vid_dec_start_stop(struct video_client_ctx *client_ctx, u32 start)
 
 	if (start) {
 		if (client_ctx->seq_header_set) {
-			DBG("%s(): Seq Hdr set: Send START_DONE to client",
+			INFO("%s(): Seq Hdr set: Send START_DONE to client",
 				 __func__);
 			vdec_msg = kzalloc(sizeof(*vdec_msg), GFP_KERNEL);
 			if (!vdec_msg) {
@@ -1184,7 +1193,7 @@ static u32 vid_dec_start_stop(struct video_client_ctx *client_ctx, u32 start)
 			    client_ctx);
 
 		} else {
-			DBG("%s(): Calling decode_start()", __func__);
+			INFO("%s(): Calling decode_start()", __func__);
 			vcd_status =
 			    vcd_decode_start(client_ctx->vcd_handle, NULL);
 
@@ -1195,7 +1204,7 @@ static u32 vid_dec_start_stop(struct video_client_ctx *client_ctx, u32 start)
 			}
 		}
 	} else {
-		DBG("%s(): Calling vcd_stop()", __func__);
+		INFO("%s(): Calling vcd_stop()", __func__);
 		mutex_lock(&vid_dec_device_p->lock);
 		vcd_status = VCD_ERR_FAIL;
 		if (!client_ctx->stop_called) {
@@ -1224,6 +1233,9 @@ static u32 vid_dec_decode_frame(struct video_client_ctx *client_ctx,
 	struct file *file;
 	s32 buffer_index = -1;
 	u32 vcd_status = VCD_ERR_FAIL;
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+	u32 ion_flag = 0;
+#endif
 
 	if (!client_ctx || !input_frame_info)
 		return false;
@@ -1341,7 +1353,7 @@ static u32 vid_dec_flush(struct video_client_ctx *client_ctx,
 {
 	u32 vcd_status = VCD_ERR_FAIL;
 
-	DBG("msm_vidc_dec: %s() called with dir = %u", __func__,
+	INFO("msm_vidc_dec: %s() called with dir = %u", __func__,
 		 flush_dir);
 	if (!client_ctx) {
 		ERR("\n Invalid client_ctx");
@@ -2010,7 +2022,7 @@ static u32 vid_dec_close_client(struct video_client_ctx *client_ctx)
 	struct vid_dec_msg *vdec_msg;
 	u32 vcd_status;
 
-	DBG("msm_vidc_dec: Inside %s()", __func__);
+	INFO("msm_vidc_dec: Inside %s()", __func__);
 	if (!client_ctx || (!client_ctx->vcd_handle)) {
 		ERR("\n Invalid client_ctx");
 		return false;
@@ -2063,11 +2075,6 @@ int vid_dec_open_client(struct video_client_ctx **vid_clnt_ctx, int flags)
 	}
 	*vid_clnt_ctx = NULL;
 
-	if (!vid_clnt_ctx) {
-		ERR("Invalid input\n");
-		return -EINVAL;
-	}
-	*vid_clnt_ctx = NULL;
 	client_count = vcd_get_num_of_clients();
 	if (client_count == VIDC_MAX_NUM_CLIENTS) {
 		ERR("ERROR : vid_dec_open() max number of clients"
@@ -2223,6 +2230,7 @@ static const struct file_operations vid_dec_fops[2] = {
 
 };
 
+
 void vid_dec_interrupt_deregister(void)
 {
 }
@@ -2247,7 +2255,7 @@ static int vid_dec_vcd_init(void)
 	u32 i;
 
 	/* init_timer(&hw_timer); */
-	DBG("msm_vidc_dec: Inside %s()", __func__);
+	INFO("msm_vidc_dec: Inside %s()", __func__);
 	vid_dec_device_p->num_clients = 0;
 
 	for (i = 0; i < VIDC_MAX_NUM_CLIENTS; i++) {
@@ -2289,7 +2297,7 @@ static int __init vid_dec_init(void)
 	int rc = 0, i = 0, j = 0;
 	struct device *class_devp;
 
-	DBG("msm_vidc_dec: Inside %s()", __func__);
+	INFO("msm_vidc_dec: Inside %s()", __func__);
 	vid_dec_device_p = kzalloc(sizeof(struct vid_dec_dev), GFP_KERNEL);
 	if (!vid_dec_device_p) {
 		ERR("%s Unable to allocate memory for vid_dec_dev\n",
@@ -2355,6 +2363,7 @@ error_vid_dec_class_create:
 error_vid_dec_alloc_chrdev_region:
 	kfree(vid_dec_device_p);
 	return rc;
+
 }
 
 static void __exit vid_dec_exit(void)
@@ -2367,7 +2376,7 @@ static void __exit vid_dec_exit(void)
 	class_destroy(vid_dec_class);
 	unregister_chrdev_region(vid_dec_dev_num, NUM_OF_DRIVER_NODES);
 	kfree(vid_dec_device_p);
-	DBG("msm_vidc_dec: Return from %s()", __func__);
+	INFO("msm_vidc_dec: Return from %s()", __func__);
 }
 
 MODULE_LICENSE("GPL v2");

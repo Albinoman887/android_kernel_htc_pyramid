@@ -956,7 +956,7 @@ static void mdp_drv_init(void)
 #endif
 }
 
-int mdp_get_gamma_curvy(struct gamma_curvy *gamma_tbl, struct gamma_curvy *gc, struct mdp_reg *color_enhancement_tbl)
+int mdp_get_gamma_curvy(struct gamma_curvy *gamma_tbl, struct gamma_curvy *gc)
 {
 	uint32_t *ref_y_gamma;
 	uint32_t *ref_y_shade;
@@ -1003,15 +1003,13 @@ int mdp_get_gamma_curvy(struct gamma_curvy *gamma_tbl, struct gamma_curvy *gc, s
 	/* check if lut component is enabled */
 	val = inpdw(MDP_BASE + 0x90070);
 	val = val & (0x7);
-	//if (0x7 == val) {
-	if (color_enhancement_tbl) {
+	if (0x7 == val) {
 		for (i = 0; i < cmap.len; i++) {
 			addr = 0x94800 + (0x400 * mdp_lut_i) + cmap.start * 4 + i * 4;
-
 			val = inpdw(MDP_BASE + addr);
-			*r++ = (color_enhancement_tbl[i].val & 0xff0000) >> 16;
-			*b++ = (color_enhancement_tbl[i].val & 0xff00) >> 8;
-			*g++ = color_enhancement_tbl[i].val & 0xff;
+			*r++ = (val & 0xff0000) >> 16;
+			*b++ = (val & 0xff00) >> 8;
+			*g++ = val & 0xff;
 		}
 	} else {
 		for (i = 0; i < cmap.len; i++) {
@@ -1331,13 +1329,14 @@ void mdp_color_enhancement(const struct mdp_reg *reg_seq, int size)
 	int i;
 
 	printk(KERN_INFO "%s\n", __func__);
+	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 	for (i = 0; i < size; i++) {
 		if (reg_seq[i].mask == 0x0)
 			outpdw(MDP_BASE + reg_seq[i].reg, reg_seq[i].val);
 		else
 			mdp_write_reg_mask(reg_seq[i].reg, reg_seq[i].val, reg_seq[i].mask);
 	}
-
+	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 	return ;
 }
 

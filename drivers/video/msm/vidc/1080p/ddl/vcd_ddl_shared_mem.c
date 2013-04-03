@@ -156,6 +156,24 @@
 #define VIDC_SM_NEW_I_PERIOD_VALUE_BMASK       0xffffffff
 #define VIDC_SM_NEW_I_PERIOD_VALUE_SHFT        0
 
+#define VIDC_SM_BATCH_INPUT_ADDR                                  0x00a4
+#define VIDC_SM_BATCH_INPUT_ADDR_VALUE_BMSK                       0xffffffff
+#define VIDC_SM_BATCH_INPUT_ADDRL_VALUE_SHFT                      0
+#define VIDC_SM_BATCH_OUTPUT_ADDR                                 0x00a8
+#define VIDC_SM_BATCH_OUTPUT_ADDR_VALUE_BMSK                      0xffffffff
+#define VIDC_SM_BATCH_OUTPUT_ADDR_VALUE_SHFT                      0
+#define VIDC_SM_BATCH_OUTPUT_SIZE_ADDR                            0x00ac
+#define VIDC_SM_BATCH_OUTPUT_SIZE_VALUE_BMSK                      0xffffffff
+#define VIDC_SM_BATCH_OUTPUT_SIZE_VALUE_SHFT                      0
+#define VIDC_SM_ENC_SLICE_BATCH_INT_CTRL_ADDR                     0x01c8
+#define VIDC_SM_ENC_SLICE_BATCH_INT_CTRL_VALUE_BMSK               0x1
+#define VIDC_SM_ENC_SLICE_BATCH_INT_CTRL_VALUE_SHFT               0
+#define VIDC_SM_ENC_NUM_OF_SLICE_ADDR                             0x01cc
+#define VIDC_SM_ENC_NUM_OF_SLICE_VALUE_BMSK                       0xffffffff
+#define VIDC_SM_ENC_NUM_OF_SLICE_VALUE_SHFT                       0
+#define VIDC_SM_ENC_NUM_OF_SLICE_COMP_ADDR                        0x01d0
+#define VIDC_SM_ENC_NUM_OF_SLICE_COMP_VALUE_BMSK                  0xffffffff
+#define VIDC_SM_ENC_NUM_OF_SLICE_COMP_VALUE_SHFT                  0
 
 
 #define VIDC_SM_ALLOCATED_LUMA_DPB_SIZE_ADDR               0x0064
@@ -185,6 +203,14 @@
 #define VIDC_SM_METADATA_ENABLE_QP_BMSK              0x1
 #define VIDC_SM_METADATA_ENABLE_QP_SHFT              0
 
+#define VIDC_SM_ASPECT_RATIO_INFO_ADDR               0x00c8
+#define VIDC_SM_MPEG4_ASPECT_RATIO_INFO_BMSK         0xf
+#define VIDC_SM_MPEG4_ASPECT_RATIO_INFO_SHFT         0x0
+#define VIDC_SM_EXTENDED_PAR_ADDR                    0x00cc
+#define VIDC_SM_EXTENDED_PAR_WIDTH_BMSK              0xffff0000
+#define VIDC_SM_EXTENDED_PAR_WIDTH_SHFT              0xf
+#define VIDC_SM_EXTENDED_PAR_HEIGHT_BMSK             0x0000ffff
+#define VIDC_SM_EXTENDED_PAR_HEIGHT_SHFT             0x0
 
 #define VIDC_SM_METADATA_STATUS_ADDR         0x003c
 #define VIDC_SM_METADATA_STATUS_STATUS_BMSK  0x1
